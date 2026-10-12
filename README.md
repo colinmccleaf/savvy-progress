@@ -3,8 +3,9 @@
 An always-visible progress tracker for Claude.
 
 - **Bar above the chat box** — always on, even with the side panel closed:
-  `████░░░░ Savvy Progress 2/4 · now: Drafting outreach emails`
-- **Side panel** — every step with ✅ done, ▶ in progress, ☐ to do, plus a progress bar.
+  `Savvy Progress ████████████░░░░░░░░░░░░ 50% Step 3/6 · Writing the SEO report`
+- **Side panel** — the same line, then every step with ✅ done, ▶ in progress, ☐ to do.
+- **In the chat** — Claude also writes the same line in its replies while it works, so it shows even where the bar can't.
 - **Keeps Claude on track** — Claude breaks multi-step work into 3–8 steps (last one: "Check the work") and ticks them off as it goes.
 
 ## Install
