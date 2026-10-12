@@ -15,26 +15,38 @@ const GUIDANCE = [
   'For any task with more than one step or tool call, create its steps with TaskCreate before the first other tool call (3 to 8 steps, the last one "Check the work"),',
   'mark each step in_progress with TaskUpdate before starting it and completed the moment it finishes.',
   'Never mark a step completed that did not fully finish. Quick one-step answers need no steps.',
+  'Also put the Savvy Progress line in your replies while a task runs, exactly as: Savvy Progress <24-character bar of █ and ░> <percent>% Step <n>/<total> · <current step>, for example: Savvy Progress ████████████░░░░░░░░░░░░ 50% Step 3/6 · Writing the SEO report.',
 ].join(' ')
 
 const ICON: Record<StepStatus, string> = { completed: '✅', in_progress: '▶', pending: '☐' }
 
+const BAR_WIDTH = 24
+
 function counts(list: readonly Step[]) {
   const done = list.filter(s => s.status === 'completed').length
   const now = list.find(s => s.status === 'in_progress')
-  return { done, total: list.length, left: list.length - done, now }
+  const next = list.find(s => s.status === 'pending')
+  return { done, total: list.length, left: list.length - done, now, next }
 }
 
-function bar(done: number, total: number, width = 12) {
-  const filled = total === 0 ? 0 : Math.round((done / total) * width)
+function bar(fraction: number, width = BAR_WIDTH) {
+  const filled = Math.max(0, Math.min(width, Math.round(fraction * width)))
   return '█'.repeat(filled) + '░'.repeat(width - filled)
 }
 
+// One line, everywhere: "Savvy Progress ████████████░░░░░░░░░░░░ 50% Step 3/6 · Writing the SEO report"
+function line(list: readonly Step[]) {
+  const { done, total, now, next } = counts(list)
+  if (total === 0) return `${TITLE} ${bar(0)} 0% · no task running`
+  if (done === total) return `${TITLE} ${bar(1)} 100% Step ${total}/${total} · Done ✅`
+  const step = Math.min(total, done + (now ? 1 : 0))
+  const fraction = step / total
+  const label = now ? (now.activeForm ?? now.subject) : `Up next: ${next?.subject ?? ''}`
+  return `${TITLE} ${bar(fraction)} ${Math.round(fraction * 100)}% Step ${Math.max(step, 1)}/${total} · ${label}`
+}
+
 function summary(list: readonly Step[]) {
-  const { done, total, now } = counts(list)
-  if (total === 0) return undefined
-  if (done === total) return `${TITLE}: all ${total} steps done ✅`
-  return `${TITLE} ${done}/${total}${now ? ` · now: ${now.activeForm ?? now.subject}` : ''}`
+  return list.length === 0 ? undefined : line(list)
 }
 
 export const register: Register = on => {
@@ -146,10 +158,10 @@ export const register: Register = on => {
 
     return (
       <Box flexDirection="column">
-        <Text bold>
-          {TITLE} · {done}/{total} done{left > 0 ? ` · ${left} left` : ' ✅'}
+        <Text bold>{line(list)}</Text>
+        <Text dimColor>
+          {done}/{total} done{left > 0 ? ` · ${left} left` : ''}
         </Text>
-        <Text>{bar(done, total)}</Text>
         {list.map(s => (
           <Text key={s.id} dimColor={s.status === 'completed'} bold={s.status === 'in_progress'}>
             {ICON[s.status]} {s.status === 'in_progress' ? (s.activeForm ?? s.subject) : s.subject}
@@ -165,20 +177,13 @@ export const register: Register = on => {
     }
     const { Box, Text } = $.ui.resolve(e)
     const list = await read($, steps)
-    const room = Math.max(20, e.props.bodyColumns)
+    const text = line(list)
+    const room = Math.max(40, e.props.bodyColumns)
+    const shown = text.length > room ? `${text.slice(0, room - 1)}…` : text
 
-    if (list.length === 0) {
-      return (
-        <Box>
-          <Text dimColor>{`${bar(0, 1, 8)} ${TITLE} · no task running`.slice(0, room)}</Text>
-        </Box>
-      )
-    }
-
-    const { done, total } = counts(list)
     return (
       <Box>
-        <Text>{`${bar(done, total, 8)} ${summary(list) ?? ''}`.slice(0, room)}</Text>
+        <Text dimColor={list.length === 0}>{shown}</Text>
       </Box>
     )
   })
